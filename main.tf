@@ -6,3 +6,4 @@ resource "github_repository" "example2" {
   description = "My awesome codebase"
   private     = false
 }
+
