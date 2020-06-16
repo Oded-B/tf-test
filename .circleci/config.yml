@@ -20,3 +20,15 @@ workflows:
           requires:
             - terraform/lint
           terraform-version: 0.12.2
+          filters:
+            branches:
+              ignore:
+                - master
+      - terraform/apply:
+          requires:
+            - terraform/lint
+          terraform-version: 0.12.2
+          filters:
+            branches:
+              only:
+                - master
