@@ -14,8 +14,12 @@ workflows:
       - terraform/install:
           terraform-version: 0.12.2
       - terraform/lint:
+          requires:
+            - terraform/install
           terraform-version: 0.12.2
       - terraform/plan:
+          requires:
+            - terraform/lint
           terraform-version: 0.12.2
   welcome:
     # Run the welcome/run job in its own container
