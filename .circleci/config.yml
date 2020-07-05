@@ -149,6 +149,8 @@ commands:
         type: boolean
       tfnotify-ignore-regex:
         default: '"\s+data\..+\.json:"'
+      terraform-path:
+        default: .
         type: string
     steps:
       - run:
