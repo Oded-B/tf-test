@@ -1,8 +1,8 @@
 provider "github" {
   individual = false
 }
-resource "github_repository" "example777" {
-  name        = "example7777"
+resource "github_repository" "example78" {
+  name        = "example7788"
   description = "My awesome codebase other REPO"
   private     = false
 }
