@@ -5,21 +5,52 @@ orbs:
   # Declare a dependency on the welcome-orb
   terraform: bulderbank/terraform@2.5.0
 # Orchestrate or schedule a set of jobs
+#
+parameters:
+  # This parameter is used to trigger the main workflow
+  trigger:
+    type: boolean
+    default: true
+  # A parameter per package
+  github1:
+    type: boolean
+    default: false
+  github2:
+    type: boolean
+    default: false
+
+
+jobs:
+  trigger-workflows:
+    docker:
+      - image: circleci/node
+    steps:
+      - checkout
+      - run:
+          name: Trigger workflows
+          command: chmod +x .circleci/circle_trigger.sh && .circleci/circle_trigger.sh
 workflows:
   version: 2
+  ci:
+    when: << pipeline.parameters.trigger >>
+    jobs:
+      - trigger-workflows
   # Name the workflow "welcome"
-  terraform:
+  github1:
     jobs:
       - terraform/install:
           terraform-version: 0.12.2
+          terraform-path: github1
       - terraform/lint:
           requires:
             - terraform/install
           terraform-version: 0.12.2
+          terraform-path: github1
       - terraform/plan:
           requires:
             - terraform/lint
           terraform-version: 0.12.2
+          terraform-path: github1
           filters:
             branches:
               ignore:
@@ -28,6 +59,35 @@ workflows:
           requires:
             - terraform/lint
           terraform-version: 0.12.2
+          terraform-path: github1
+          filters:
+            branches:
+              only:
+                - master
+  github2:
+    jobs:
+      - terraform/install:
+          terraform-version: 0.12.2
+          terraform-path: github2
+      - terraform/lint:
+          requires:
+            - terraform/install
+          terraform-version: 0.12.2
+          terraform-path: github2
+      - terraform/plan:
+          requires:
+            - terraform/lint
+          terraform-version: 0.12.2
+          terraform-path: github2
+          filters:
+            branches:
+              ignore:
+                - master
+      - terraform/apply:
+          requires:
+            - terraform/lint
+          terraform-version: 0.12.2
+          terraform-path: github2
           filters:
             branches:
               only:
