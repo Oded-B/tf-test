@@ -298,7 +298,8 @@ jobs:
       - when:
           condition: << parameters.checkout >>
           steps:
-            - checkout
+            - checkout:
+                path: ~/code
       - when:
           condition: << parameters.attach-workspace >>
           steps:
@@ -315,7 +316,7 @@ jobs:
           terraform-lock-timeout: << parameters.terraform-lock-timeout >>
           terraform-workspace: << parameters.terraform-workspace >>
   tf-install:
-    working_directory: ~/<< parameters.terraform-path >>
+    working_directory:  ~/code/<< parameters.terraform-path >>
     executor:
       name: default
       terraform-version: << parameters.terraform-version >>
@@ -358,7 +359,8 @@ jobs:
       - when:
           condition: << parameters.checkout >>
           steps:
-            - checkout
+            - checkout:
+                path: ~/code
       - when:
           condition: << parameters.attach-workspace >>
           steps:
@@ -419,7 +421,8 @@ jobs:
       - when:
           condition: << parameters.checkout >>
           steps:
-            - checkout
+            - checkout:
+                path: ~/code
       - when:
           condition: << parameters.attach-workspace >>
           steps:
@@ -503,7 +506,8 @@ jobs:
       - when:
           condition: << parameters.checkout >>
           steps:
-            - checkout
+            - checkout:
+                path: ~/code
       - when:
           condition: << parameters.attach-workspace >>
           steps:
