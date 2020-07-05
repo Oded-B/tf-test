@@ -3,9 +3,229 @@ version: 2.1
 # Use a package of configuration called an orb.
 orbs:
   # Declare a dependency on the welcome-orb
-  terraform: bulderbank/terraform@2.5.0
+  # terraform: bulderbank/terraform@2.5.0
 # Orchestrate or schedule a set of jobs
-#
+
+
+commands:
+  helm-install:
+    parameters:
+      helm-tar:
+        default: helm-v2.13.1-linux-amd64.tar.gz
+        type: string
+      helm-url:
+        default: https://storage.googleapis.com/kubernetes-helm
+        type: string
+    steps:
+      - run:
+          command: |
+            wget <<parameters.helm-url>>/<< parameters.helm-tar >>
+            tar xzfv <<parameters.helm-tar>>
+            cp ./linux-amd64/helm /usr/local/bin/helm
+            rm -rf <<parameters.helm-tar>> linux-amd64
+          name: helm install
+      - run:
+          command: helm init --client-only
+          name: helm init
+  terraform-apply:
+    parameters:
+      terraform-lock-timeout:
+        default: 5m
+        type: string
+      terraform-workspace:
+        default: default
+        type: string
+    steps:
+      - run:
+          command: |
+            terraform apply \
+              --auto-approve \
+              -parallelism=40 \
+              -lock-timeout="<< parameters.terraform-lock-timeout >>" \
+              terraform-<< parameters.terraform-workspace >>.plan
+          name: terraform apply
+  terraform-get:
+    steps:
+      - run:
+          command: |
+            terraform version
+            terraform init -backend=false
+            ls -la .terraform/plugins/linux_amd64/
+
+            # This is a hack. Since the terraform.d directory is outside the
+            # workspace attach to workspace does not work. This should rather be a
+            # cache, but for now we just move the custom plugins to the local
+            # .terraform directory which gets persisted.
+            mv -v ~/.terraform.d/plugins/linux_amd64/* .terraform/plugins/linux_amd64/ || true
+            ls -la .terraform/plugins/linux_amd64/
+          name: terraform get
+  terraform-init:
+    parameters:
+      terraform-backend-config:
+        default: ""
+        type: string
+      terraform-lock-timeout:
+        default: 5m
+        type: string
+      terraform-workspace:
+        default: default
+        type: string
+    steps:
+      - run:
+          command: |
+            terraform version
+            ls -la .terraform/plugins/linux_amd64/
+            terraform init \
+              -get=false \
+              -reconfigure \
+              -lock-timeout="<< parameters.terraform-lock-timeout >>" \
+              -backend-config="<< parameters.terraform-backend-config >>"
+            ls -la .terraform/plugins/linux_amd64/
+            terraform providers
+            terraform workspace select << parameters.terraform-workspace >>
+          name: terraform init
+  terraform-lint:
+    parameters:
+      terraform-lint-recursive:
+        default: false
+        description: |
+          Recursive terraform linting (requires Terraform v0.12)
+        type: boolean
+    steps:
+      - unless:
+          condition: << parameters.terraform-lint-recursive >>
+          steps:
+            - run:
+                command: |
+                  if [ $(terraform fmt | grep -v .terraform | tee fmt_result.txt | wc -l) -gt 0 ]; then
+                    echo "Terraform files require syntax reformating:"
+                    echo
+                    cat fmt_result.txt
+                    rm fmt_result.txt
+                    git checkout -- .
+                    echo
+                    echo "Please run terraform fmt"
+                    exit 1
+                  fi
+                name: terraform lint
+      - when:
+          condition: << parameters.terraform-lint-recursive >>
+          steps:
+            - run:
+                command: |
+                  set +e # Allow failing commands, so that we can check for them
+
+                  tf_fmt=$(terraform fmt -recursive -check)
+                  tf_fmt_status=$?
+
+                  if test ${tf_fmt_status} -ne 0; then
+                    echo "Terraform files require syntax reformating:"
+                    echo
+                    echo ${tf_fmt}
+                    echo
+                    echo "Please run terraform fmt -recursive"
+                    exit 1
+                  fi
+                name: terraform lint
+  terraform-plan:
+    parameters:
+      terraform-lock-timeout:
+        default: 5m
+        type: string
+      terraform-plan-save:
+        default: true
+        description: |
+          Boolean for saving terraform plan to file
+        type: boolean
+      terraform-workspace:
+        default: default
+        type: string
+      tfnotify-ignore-enable:
+        default: true
+        description: |
+          Boolean for enabling grep with invert match, useful for hiding output in tf apply.
+        type: boolean
+      tfnotify-ignore-regex:
+        default: '"\s+data\..+\.json:"'
+        type: string
+    steps:
+      - run:
+          command: |
+            VAR_DIR=env/<< parameters.terraform-workspace >>
+            VAR_FILES=$(ls ${VAR_DIR} | tr '\n' '\0' | xargs -0 printf "-var-file=${VAR_DIR}/%s ")
+            echo "VAR_FILES=${VAR_FILES}"
+
+            if [ << parameters.tfnotify-ignore-enable >> == true ]; then
+              TFNOTIFY_IGNORE_FILTER='grep -v -E << parameters.tfnotify-ignore-regex >>'
+            else
+              TFNOTIFY_IGNORE_FILTER=cat
+            fi
+
+            if [ << parameters.terraform-plan-save >> == true ]; then
+              TF_PLAN_SAVE=-out=terraform-<< parameters.terraform-workspace >>.plan
+            else
+              TF_PLAN_SAVE=
+            fi
+
+            terraform plan \
+              ${VAR_FILES} \
+              -lock-timeout=<< parameters.terraform-lock-timeout >> \
+              -parallelism=40 \
+              ${TF_PLAN_SAVE} \
+                | ${TFNOTIFY_IGNORE_FILTER} \
+                | tfnotify plan --title "## Plan result for << parameters.terraform-workspace >>"
+          name: terraform plan
+  terraform-plugins:
+    parameters:
+      terraform-plugins:
+        default: ""
+        type: string
+    steps:
+      - run:
+          command: |
+            plugins_list="<< parameters.terraform-plugins >>"
+            plugins_dir=~/.terraform.d/plugins/linux_amd64
+            mkdir -p $plugins_dir
+
+            echo "Downloading plugins to $plugins_dir..."
+
+            for plugin_url in $plugins_list; do
+              plugin_name=$(basename $plugin_url | sed -r 's/(^[a-z-]+_v\d+\.\d+\.\d+)(.+)/\1/g')
+              echo "Downloading plugin $plugin_name..."
+              wget -O "$plugins_dir/$plugin_name" $plugin_url
+              chmod +x "$plugins_dir/$plugin_name"
+            done
+
+            ls -la $plugins_dir
+          name: terraform plugins
+  tfnotify-install:
+    parameters:
+      tfnotify-url:
+        default: https://github.com/mercari/tfnotify/releases/download
+        type: string
+      tfnotify-version:
+        default: v0.6.0
+        type: string
+    steps:
+      - run:
+          command: |
+            wget << parameters.tfnotify-url >>/<< parameters.tfnotify-version >>/tfnotify_linux_amd64.tar.gz
+            mkdir -v tfnotify_linux_amd64
+            tar -xzvf tfnotify_linux_amd64.tar.gz -C tfnotify_linux_amd64
+            mv -v tfnotify_linux_amd64/tfnotify /usr/local/bin/tfnotify
+            rm -vrf tfnotify_linux_amd64*
+          name: tfnotify install
+
+executors:
+  default:
+    docker:
+      - image: hashicorp/terraform:<< parameters.terraform-version >>
+    parameters:
+      terraform-version:
+        default: 0.11.14
+        type: string
+
+
 parameters:
   # This parameter is used to trigger the main workflow
   trigger:
@@ -29,6 +249,288 @@ jobs:
       - run:
           name: Trigger workflows
           command: chmod +x .circleci/circle_trigger.sh && .circleci/circle_trigger.sh
+
+
+  tf-apply:
+    executor:
+      name: default
+      terraform-version: << parameters.terraform-version >>
+    parameters:
+      attach-workspace:
+        default: true
+        description: |
+          Boolean for whether or not to attach to an existing workspace. Default is true.
+        type: boolean
+      checkout:
+        default: false
+        description: |
+          Boolean for whether or not to checkout as a first step. Default is false.
+        type: boolean
+      helm-tar:
+        default: helm-v2.13.1-linux-amd64.tar.gz
+        type: string
+      helm-url:
+        default: https://storage.googleapis.com/kubernetes-helm
+        type: string
+      terraform-backend-config:
+        default: ""
+        type: string
+      terraform-lock-timeout:
+        default: 5m
+        type: string
+      terraform-path:
+        default: .
+        type: string
+      terraform-version:
+        default: 0.11.14
+        type: string
+      terraform-workspace:
+        default: default
+        type: string
+      workspace-root:
+        default: .
+        description: |
+          Workspace root path that is either an absolute path or a path relative to the working directory. Defaults to '.' (the working directory)
+        type: string
+    steps:
+      - when:
+          condition: << parameters.checkout >>
+          steps:
+            - checkout
+      - when:
+          condition: << parameters.attach-workspace >>
+          steps:
+            - attach_workspace:
+                at: << parameters.workspace-root >>
+      - helm-install:
+          helm-tar: << parameters.helm-tar >>
+          helm-url: << parameters.helm-url >>
+      - terraform-init:
+          terraform-backend-config: << parameters.terraform-backend-config >>
+          terraform-lock-timeout: << parameters.terraform-lock-timeout >>
+          terraform-workspace: << parameters.terraform-workspace >>
+      - terraform-apply:
+          terraform-lock-timeout: << parameters.terraform-lock-timeout >>
+          terraform-workspace: << parameters.terraform-workspace >>
+  tf-install:
+    executor:
+      name: default
+      terraform-version: << parameters.terraform-version >>
+    parameters:
+      attach-workspace:
+        default: true
+        description: |
+          Boolean for whether or not to attach to an existing workspace. Default is true.
+        type: boolean
+      checkout:
+        default: true
+        description: |
+          Boolean for whether or not to checkout as a first step. Default is false.
+        type: boolean
+      persist-to-workspace:
+        default: true
+        description: |
+          Should this job persist files to a workspace? Defaults to true
+        type: boolean
+      terraform-path:
+        default: .
+        type: string
+      terraform-plugins:
+        default: ""
+        type: string
+      terraform-version:
+        default: 0.11.14
+        type: string
+      workspace-path:
+        default: .
+        description: |
+          Path of the workspace to persist to relative to workspace-root. Typically this is the same as the destination-orb-path. If the default value of blank is provided then this job will not persist to a workspace.
+        type: string
+      workspace-root:
+        default: .
+        description: |
+          Workspace root path that is either an absolute path or a path relative to the working directory. Defaults to '.' (the working directory)
+        type: string
+    steps:
+      - when:
+          condition: << parameters.checkout >>
+          steps:
+            - checkout
+      - when:
+          condition: << parameters.attach-workspace >>
+          steps:
+            - attach_workspace:
+                at: << parameters.workspace-root >>
+      - terraform-plugins:
+          terraform-plugins: << parameters.terraform-plugins >>
+      - terraform-get
+      - when:
+          condition: << parameters.persist-to-workspace >>
+          steps:
+            - persist_to_workspace:
+                paths:
+                  - << parameters.workspace-path >>
+                root: << parameters.workspace-root >>
+  tf-lint:
+    executor:
+      name: default
+      terraform-version: << parameters.terraform-version >>
+    parameters:
+      attach-workspace:
+        default: false
+        description: |
+          Boolean for whether or not to attach to an existing workspace. Default is false.
+        type: boolean
+      checkout:
+        default: true
+        description: |
+          Boolean for whether or not to checkout as a first step. Default is true.
+        type: boolean
+      persist-to-workspace:
+        default: false
+        description: |
+          Should this job persist files to a workspace? Defaults to true
+        type: boolean
+      terraform-lint-recursive:
+        default: false
+        description: |
+          Recursive terraform linting (requires Terraform v0.12)
+        type: boolean
+      terraform-path:
+        default: .
+        type: string
+      terraform-version:
+        default: 0.11.14
+        type: string
+      workspace-path:
+        default: .
+        description: |
+          Path of the workspace to persist to relative to workspace-root. Typically this is the same as the destination-orb-path. If the default value of blank is provided then this job will not persist to a workspace.
+        type: string
+      workspace-root:
+        default: .
+        description: |
+          Workspace root path that is either an absolute path or a path relative to the working directory. Defaults to '.' (the working directory)
+        type: string
+    steps:
+      - when:
+          condition: << parameters.checkout >>
+          steps:
+            - checkout
+      - when:
+          condition: << parameters.attach-workspace >>
+          steps:
+            - attach_workspace:
+                at: << parameters.workspace-root >>
+      - terraform-lint:
+          terraform-lint-recursive: << parameters.terraform-lint-recursive >>
+      - when:
+          condition: << parameters.persist-to-workspace >>
+          steps:
+            - persist_to_workspace:
+                paths:
+                  - << parameters.workspace-path >>
+                root: << parameters.workspace-root >>
+  tf-plan:
+    executor:
+      name: default
+      terraform-version: << parameters.terraform-version >>
+    parameters:
+      attach-workspace:
+        default: true
+        description: |
+          Boolean for whether or not to attach to an existing workspace. Default is false.
+        type: boolean
+      checkout:
+        default: false
+        description: |
+          Boolean for whether or not to checkout as a first step. Default is true.
+        type: boolean
+      helm-tar:
+        default: helm-v2.13.1-linux-amd64.tar.gz
+        type: string
+      helm-url:
+        default: https://storage.googleapis.com/kubernetes-helm
+        type: string
+      persist-to-workspace:
+        default: true
+        description: |
+          Should this job persist files to a workspace? Defaults to true
+        type: boolean
+      terraform-backend-config:
+        default: ""
+        type: string
+      terraform-lock-timeout:
+        default: 5m
+        type: string
+      terraform-path:
+        default: .
+        type: string
+      terraform-plan-save:
+        default: true
+        type: boolean
+      terraform-version:
+        default: 0.11.14
+        type: string
+      terraform-workspace:
+        default: default
+        type: string
+      tfnotify-ignore-enable:
+        default: true
+        description: |
+          Boolean for enabling grep with invert match, useful for hiding output in tf apply.
+        type: boolean
+      tfnotify-ignore-regex:
+        default: '"\s+data\..+\.json:"'
+        description: |
+          Regex of the grep you want to omitt.
+        type: string
+      tfnotify-url:
+        default: https://github.com/mercari/tfnotify/releases/download
+        type: string
+      tfnotify-version:
+        default: v0.6.0
+        type: string
+      workspace-root:
+        default: .
+        description: |
+          Workspace root path that is either an absolute path or a path relative to the working directory. Defaults to '.' (the working directory)
+        type: string
+    steps:
+      - when:
+          condition: << parameters.checkout >>
+          steps:
+            - checkout
+      - when:
+          condition: << parameters.attach-workspace >>
+          steps:
+            - attach_workspace:
+                at: << parameters.workspace-root >>
+      - helm-install:
+          helm-tar: << parameters.helm-tar >>
+          helm-url: << parameters.helm-url >>
+      - tfnotify-install:
+          tfnotify-url: << parameters.tfnotify-url >>
+          tfnotify-version: << parameters.tfnotify-version >>
+      - terraform-init:
+          terraform-backend-config: << parameters.terraform-backend-config >>
+          terraform-lock-timeout: << parameters.terraform-lock-timeout >>
+          terraform-workspace: << parameters.terraform-workspace >>
+      - terraform-plan:
+          terraform-lock-timeout: << parameters.terraform-lock-timeout >>
+          terraform-plan-save: << parameters.terraform-plan-save >>
+          terraform-workspace: << parameters.terraform-workspace >>
+          tfnotify-ignore-enable: << parameters.tfnotify-ignore-enable >>
+          tfnotify-ignore-regex: << parameters.tfnotify-ignore-regex >>
+      - when:
+          condition: << parameters.persist-to-workspace >>
+          steps:
+            - persist_to_workspace:
+                paths:
+                  - terraform-<< parameters.terraform-workspace >>.plan
+                root: << parameters.workspace-root >>
+
+
 workflows:
   version: 2
   ci:
@@ -38,15 +540,15 @@ workflows:
   # Name the workflow "welcome"
   github1:
     jobs:
-      - terraform/install:
+      - tf-install:
           terraform-version: 0.12.2
           terraform-path: github1
-      - terraform/lint:
+      - tf-lint:
           requires:
             - terraform/install
           terraform-version: 0.12.2
           terraform-path: github1
-      - terraform/plan:
+      - tf-plan:
           requires:
             - terraform/lint
           terraform-version: 0.12.2
@@ -55,7 +557,7 @@ workflows:
             branches:
               ignore:
                 - master
-      - terraform/apply:
+      - tf-apply:
           requires:
             - terraform/lint
           terraform-version: 0.12.2
@@ -66,15 +568,15 @@ workflows:
                 - master
   github2:
     jobs:
-      - terraform/install:
+      - tf-install:
           terraform-version: 0.12.2
           terraform-path: github2
-      - terraform/lint:
+      - tf-lint:
           requires:
             - terraform/install
           terraform-version: 0.12.2
           terraform-path: github2
-      - terraform/plan:
+      - tf-plan:
           requires:
             - terraform/lint
           terraform-version: 0.12.2
@@ -83,7 +585,7 @@ workflows:
             branches:
               ignore:
                 - master
-      - terraform/apply:
+      - tf-apply:
           requires:
             - terraform/lint
           terraform-version: 0.12.2
