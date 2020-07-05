@@ -164,7 +164,7 @@ commands:
             fi
 
             if [ << parameters.terraform-plan-save >> == true ]; then
-              TF_PLAN_SAVE=-out=terraform-<< parameters.terraform-workspace >>.plan
+              TF_PLAN_SAVE=-out=terraform-<< parameters.terraform-path >>-$CIRCLE_SHA1.plan
             else
               TF_PLAN_SAVE=
             fi
@@ -254,6 +254,7 @@ jobs:
 
 
   tf-apply:
+    working_directory:  ~/code/packages/<< parameters.terraform-path >>
     executor:
       name: default
       terraform-version: << parameters.terraform-version >>
@@ -377,6 +378,7 @@ jobs:
                   - << parameters.workspace-path >>
                 root: << parameters.workspace-root >>
   tf-lint:
+    working_directory:  ~/code/packages/<< parameters.terraform-path >>
     executor:
       name: default
       terraform-version: << parameters.terraform-version >>
@@ -438,6 +440,7 @@ jobs:
                   - << parameters.workspace-path >>
                 root: << parameters.workspace-root >>
   tf-plan:
+    working_directory:  ~/code/packages/<< parameters.terraform-path >>
     executor:
       name: default
       terraform-version: << parameters.terraform-version >>
