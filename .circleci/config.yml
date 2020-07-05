@@ -545,12 +545,12 @@ workflows:
           terraform-path: github1
       - tf-lint:
           requires:
-            - terraform/install
+            - tf-install
           terraform-version: 0.12.2
           terraform-path: github1
       - tf-plan:
           requires:
-            - terraform/lint
+            - tf-lint
           terraform-version: 0.12.2
           terraform-path: github1
           filters:
@@ -559,7 +559,7 @@ workflows:
                 - master
       - tf-apply:
           requires:
-            - terraform/lint
+            - tf-lint
           terraform-version: 0.12.2
           terraform-path: github1
           filters:
@@ -573,12 +573,12 @@ workflows:
           terraform-path: github2
       - tf-lint:
           requires:
-            - terraform/install
+            - tf-install
           terraform-version: 0.12.2
           terraform-path: github2
       - tf-plan:
           requires:
-            - terraform/lint
+            - tf-lint
           terraform-version: 0.12.2
           terraform-path: github2
           filters:
@@ -587,7 +587,7 @@ workflows:
                 - master
       - tf-apply:
           requires:
-            - terraform/lint
+            - tf-lint
           terraform-version: 0.12.2
           terraform-path: github2
           filters:
