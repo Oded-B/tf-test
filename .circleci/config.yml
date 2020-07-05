@@ -48,6 +48,8 @@ commands:
     steps:
       - run:
           command: |
+            pwd
+            ls -a
             terraform version
             terraform init -backend=false
             ls -la .terraform/plugins/linux_amd64/
