@@ -313,6 +313,7 @@ jobs:
           terraform-lock-timeout: << parameters.terraform-lock-timeout >>
           terraform-workspace: << parameters.terraform-workspace >>
   tf-install:
+    working_directory: ./<< parameters.terraform-path >>
     executor:
       name: default
       terraform-version: << parameters.terraform-version >>
