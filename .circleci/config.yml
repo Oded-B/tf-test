@@ -539,6 +539,7 @@ workflows:
       - trigger-workflows
   # Name the workflow "welcome"
   github1:
+    when: << pipeline.parameters.github1 >>
     jobs:
       - tf-install:
           terraform-version: 0.12.2
@@ -567,6 +568,7 @@ workflows:
               only:
                 - master
   github2:
+    when: << pipeline.parameters.github2 >>
     jobs:
       - tf-install:
           terraform-version: 0.12.2
