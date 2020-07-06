@@ -8,25 +8,6 @@ orbs:
 
 
 commands:
-  helm-install:
-    parameters:
-      helm-tar:
-        default: helm-v2.13.1-linux-amd64.tar.gz
-        type: string
-      helm-url:
-        default: https://storage.googleapis.com/kubernetes-helm
-        type: string
-    steps:
-      - run:
-          command: |
-            wget <<parameters.helm-url>>/<< parameters.helm-tar >>
-            tar xzfv <<parameters.helm-tar>>
-            cp ./linux-amd64/helm /usr/local/bin/helm
-            rm -rf <<parameters.helm-tar>> linux-amd64
-          name: helm install
-      - run:
-          command: helm init --client-only
-          name: helm init
   terraform-apply:
     parameters:
       terraform-lock-timeout:
@@ -276,12 +257,6 @@ jobs:
         description: |
           Boolean for whether or not to checkout as a first step. Default is false.
         type: boolean
-      helm-tar:
-        default: helm-v2.13.1-linux-amd64.tar.gz
-        type: string
-      helm-url:
-        default: https://storage.googleapis.com/kubernetes-helm
-        type: string
       terraform-backend-config:
         default: ""
         type: string
@@ -313,9 +288,6 @@ jobs:
           steps:
             - attach_workspace:
                 at: << parameters.workspace-root >>
-      - helm-install:
-          helm-tar: << parameters.helm-tar >>
-          helm-url: << parameters.helm-url >>
       - terraform-init:
           terraform-backend-config: << parameters.terraform-backend-config >>
           terraform-lock-timeout: << parameters.terraform-lock-timeout >>
@@ -463,12 +435,6 @@ jobs:
         description: |
           Boolean for whether or not to checkout as a first step. Default is true.
         type: boolean
-      helm-tar:
-        default: helm-v2.13.1-linux-amd64.tar.gz
-        type: string
-      helm-url:
-        default: https://storage.googleapis.com/kubernetes-helm
-        type: string
       persist-to-workspace:
         default: true
         description: |
@@ -524,9 +490,6 @@ jobs:
           steps:
             - attach_workspace:
                 at: << parameters.workspace-root >>
-      - helm-install:
-          helm-tar: << parameters.helm-tar >>
-          helm-url: << parameters.helm-url >>
       - tfnotify-install:
           tfnotify-url: << parameters.tfnotify-url >>
           tfnotify-version: << parameters.tfnotify-version >>
