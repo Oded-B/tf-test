@@ -531,6 +531,7 @@ jobs:
       - terraform-plan:
           terraform-lock-timeout: << parameters.terraform-lock-timeout >>
           terraform-plan-save: << parameters.terraform-plan-save >>
+          terraform-path: << parameters.terraform-path >>
           terraform-workspace: << parameters.terraform-workspace >>
           tfnotify-ignore-enable: << parameters.tfnotify-ignore-enable >>
           tfnotify-ignore-regex: << parameters.tfnotify-ignore-regex >>
