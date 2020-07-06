@@ -42,7 +42,7 @@ commands:
               --auto-approve \
               -parallelism=40 \
               -lock-timeout="<< parameters.terraform-lock-timeout >>" \
-              terraform-<< parameters.terraform-workspace >>.plan
+              terraform-<< parameters.terraform-path >>-$CIRCLE_SHA1.plan
           name: terraform apply
   terraform-get:
     steps:
@@ -541,7 +541,7 @@ jobs:
           steps:
             - persist_to_workspace:
                 paths:
-                  - terraform-<< parameters.terraform-workspace >>.plan
+                  - terraform-<< parameters.terraform-path >>-$CIRCLE_SHA1.plan
                 root: << parameters.workspace-root >>
 
 
