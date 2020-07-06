@@ -45,7 +45,7 @@ commands:
               --auto-approve \
               -parallelism=40 \
               -lock-timeout="<< parameters.terraform-lock-timeout >>" \
-              terraform-<< parameters.terraform-path >>-$CIRCLE_SHA1.plan
+              plan/terraform-<< parameters.terraform-path >>-$CIRCLE_SHA1.plan
           name: terraform apply
   terraform-get:
     steps:
@@ -170,7 +170,8 @@ commands:
             fi
 
             if [ << parameters.terraform-plan-save >> == true ]; then
-              TF_PLAN_SAVE=-out=terraform-<< parameters.terraform-path >>-$CIRCLE_SHA1.plan
+              mkdir plan
+              TF_PLAN_SAVE=-out=plan/terraform-<< parameters.terraform-path >>-$CIRCLE_SHA1.plan
             else
               TF_PLAN_SAVE=
             fi
@@ -541,7 +542,7 @@ jobs:
           tfnotify-ignore-enable: << parameters.tfnotify-ignore-enable >>
           tfnotify-ignore-regex: << parameters.tfnotify-ignore-regex >>
       - store_artifacts:
-          path: terraform-<< parameters.terraform-path >>-$CIRCLE_SHA1.pla
+          path: plan
       - when:
           condition: << parameters.persist-to-workspace >>
           steps:
