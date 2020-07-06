@@ -540,6 +540,8 @@ jobs:
           terraform-workspace: << parameters.terraform-workspace >>
           tfnotify-ignore-enable: << parameters.tfnotify-ignore-enable >>
           tfnotify-ignore-regex: << parameters.tfnotify-ignore-regex >>
+      - store_artifacts:
+          path: terraform-<< parameters.terraform-path >>-$CIRCLE_SHA1.pla
       - when:
           condition: << parameters.persist-to-workspace >>
           steps:
