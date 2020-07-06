@@ -35,6 +35,9 @@ commands:
       terraform-workspace:
         default: default
         type: string
+      terraform-path:
+        default: .
+        type: string
     steps:
       - run:
           command: |
@@ -319,6 +322,7 @@ jobs:
       - terraform-apply:
           terraform-lock-timeout: << parameters.terraform-lock-timeout >>
           terraform-workspace: << parameters.terraform-workspace >>
+          terraform-path: << parameters.terraform-path >>
   tf-install:
     working_directory:  ~/code/packages/<< parameters.terraform-path >>
     executor:
