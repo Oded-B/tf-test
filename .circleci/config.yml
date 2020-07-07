@@ -235,6 +235,8 @@ jobs:
     docker:
       - image: circleci/node
     steps:
+      - run:
+          command: git config --global --add remote.origin.fetch +refs/pull/\*/head:refs/remotes/origin/pull/\*
       - checkout
       - run:
           name: Trigger workflows
@@ -281,6 +283,8 @@ jobs:
       - when:
           condition: << parameters.checkout >>
           steps:
+            - run:
+                command: git config --global --add remote.origin.fetch +refs/pull/\*/head:refs/remotes/origin/pull/\*
             - checkout:
                 path: ~/code
       - when:
@@ -340,6 +344,8 @@ jobs:
       - when:
           condition: << parameters.checkout >>
           steps:
+            - run:
+                command: git config --global --add remote.origin.fetch +refs/pull/\*/head:refs/remotes/origin/pull/\*
             - checkout:
                 path: ~/code
       - when:
@@ -403,6 +409,8 @@ jobs:
       - when:
           condition: << parameters.checkout >>
           steps:
+            - run:
+                command: git config --global --add remote.origin.fetch +refs/pull/\*/head:refs/remotes/origin/pull/\*
             - checkout:
                 path: ~/code
       - when:
@@ -483,6 +491,8 @@ jobs:
       - when:
           condition: << parameters.checkout >>
           steps:
+            - run:
+                command: git config --global --add remote.origin.fetch +refs/pull/\*/head:refs/remotes/origin/pull/\*
             - checkout:
                 path: ~/code
       - when:
