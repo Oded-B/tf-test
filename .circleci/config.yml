@@ -250,9 +250,9 @@ jobs:
           name: Trigger workflows
           command: chmod +x .circleci/circle_trigger.sh && .circleci/circle_trigger.sh
       - run:
-          command: git log
+          command: git --no-pager log
       - run:
-          command: git log --walk-reflogs
+          command: git --no-pager log --walk-reflogs
 
 
   tf-apply:
